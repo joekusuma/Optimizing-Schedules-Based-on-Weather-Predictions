@@ -2,9 +2,11 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.colors as mcolors
 import networkx as nx
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from constraint import Problem, AllDifferentConstraint, FunctionConstraint, BacktrackingSolver
 import seaborn as sns
 import logging
@@ -45,9 +47,7 @@ def add_activity_input(activity_id):
         with col2:
             duration = st.number_input("Duration (in hours)", min_value=0.5, max_value=12.0, step=0.5, key=unique_key("duration"))
         with col3:
-            weather_preference = st.multiselect("Weather Preference (Select in order of preference)", 
-                                                ["Sunny", "Cloudy", "Rainy"], 
-                                                key=unique_key("weather_pref"))
+            weather_preference = st.selectbox("Preferred Weather", ["Sunny", "Cloudy", "Rainy"], key=f"weather_{activity_id}")
     return {"name": activity_name, "duration": duration, "weather": weather_preference}
 
 
@@ -154,40 +154,82 @@ def solve_csp(activities, weather_data, start_datetime, end_datetime):
 
     return schedule
 
+def plot_activity_timeline(schedule, planning_day):
+    fig, ax = plt.subplots(figsize=(10, 3))
+
+    # Generate distinct colors for each activity
+    colors = list(mcolors.TABLEAU_COLORS.values())
+    color_idx = 0
+
+    for activity, details in schedule.items():
+        start = details['start']
+        end = details['end']
+        ax.plot([start, end], [1, 1], color=colors[color_idx], linewidth=6, label=activity)
+        color_idx = (color_idx + 1) % len(colors)
+
+    ax.set_yticks([])
+    ax.set_xlabel('Time')
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    plt.xticks(rotation=45)
+    plt.title(f'Activity Timeline for {planning_day.strftime("%Y-%m-%d")}')
+    plt.grid(True)
+    plt.legend()
+
+    return fig
+
 def user_interface():
     st.title("Activity Scheduler Using Weather Constraints (CSP)")
     st.subheader("Enter Activities")
     activities = []
-    activity_count = st.number_input("How many activities do you want to schedule?", min_value=1, max_value=10, step=1, key="activity_count")
+    activity_names = set()  # For checking unique activity names
+    activity_count = st.number_input("How many activities do you want to schedule?", min_value=1, max_value=10, step=1)
+
+    valid_input = True  # Validation flag
 
     for i in range(activity_count):
         activity = add_activity_input(i)
+        if not activity['name']:
+            st.error("Activity name cannot be blank.")
+            valid_input = False
+        if activity['name'] in activity_names:
+            st.error(f"Activity name '{activity['name']}' is already used. Please use a unique name.")
+            valid_input = False
+        activity_names.add(activity['name'])
         activities.append(activity)
 
     st.subheader("Planning Day and Time")
-    planning_day = st.date_input("Select the Day for Planning")
+    planning_day = st.date_input("Select the Day for Planning", min_value=date.today())
     start_time = st.time_input("Start Time", key="start_time")
     end_time = st.time_input("End Time", key="end_time")
 
-    if st.button("Submit"):
+    # Check for valid time inputs
+    if start_time >= end_time:
+        st.error("Start time cannot be after end time.")
+        valid_input = False
+
+    if st.button("Submit") and valid_input:
         st.write("Scheduled Activities:")
         for activity in activities:
             st.write(activity)
-        
+
         start_datetime = combine_date_time(planning_day, start_time)
         end_datetime = combine_date_time(planning_day, end_time)
 
         weather_data = fetch_weather_data(api_key, location, planning_day.strftime("%Y-%m-%d"))
-        wcsp_schedule = solve_csp(activities, weather_data, start_datetime, end_datetime)
+        csp_schedule = solve_csp(activities, weather_data, start_datetime, end_datetime)
 
-        if isinstance(wcsp_schedule, str):
-            st.write(wcsp_schedule)
+        if isinstance(csp_schedule, str):
+            st.write(csp_schedule)
         else:
             st.write("Optimized Schedule:")
-            for activity in wcsp_schedule:
-                start = wcsp_schedule[activity]['start']
-                end = wcsp_schedule[activity]['end']
+            for activity in csp_schedule:
+                start = csp_schedule[activity]['start']
+                end = csp_schedule[activity]['end']
                 st.write(f"{activity}: Start at {start.strftime('%Y-%m-%d %H:%M')}, End by {end.strftime('%Y-%m-%d %H:%M')}")
+
+            # Plot and display the activity timeline
+            fig = plot_activity_timeline(csp_schedule, planning_day)
+            st.pyplot(fig)
 
 # Main Function
 def main():
