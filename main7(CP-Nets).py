@@ -33,6 +33,18 @@ def fetch_weather_data(api_key, location, selected_date):
     df_weather['datetime'] = pd.to_datetime(df_weather['time'])
     return df_weather
 
+# Streamlit User Interface for Activity Input
+def add_activity_input(key):
+    with st.container():
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            activity_name = st.text_input("Activity Name", key=f"activity_{key}")
+        with col2:
+            duration = st.number_input("Duration (in hours)", min_value=0.5, max_value=12.0, step=0.5, key=f"duration_{key}")
+        with col3:
+            weather_preference = st.selectbox("Preferred Weather", ["Sunny", "Cloudy", "Rainy"], key=f"weather_{key}")
+    return {"name": activity_name, "duration": duration, "weather": weather_preference}
+
 def interpret_weather_score(chance_of_rain, preferred_weather):
     # Example interpretation: lower score if chance of rain is high but preference is sunny
     if preferred_weather == "Sunny":
@@ -64,39 +76,6 @@ def adjust_preferences_based_on_weather(activity_name, start_time, duration, pre
     if count > 0:
         return average_weather_score / count
     return {"Sunny": 3, "Cloudy": 2, "Rainy": 1}[preferred_weather]  # Default to initial preference if no weather data
-
-# Function for plotting the activity timeline
-def plot_activity_timeline(schedule, planning_day):
-    fig, ax = plt.subplots(figsize=(10, 3))
-    colors = list(mcolors.TABLEAU_COLORS.values())
-    color_idx = 0
-
-    for activity, details in schedule.items():
-        start = details['start']
-        end = details['end']
-        ax.plot([start, end], [1, 1], color=colors[color_idx], linewidth=6, label=activity)
-        color_idx = (color_idx + 1) % len(colors)
-
-    ax.set_yticks([])
-    ax.set_xlabel('Time')
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    plt.xticks(rotation=45)
-    plt.title(f'Activity Timeline for {planning_day.strftime("%Y-%m-%d")}')
-    plt.grid(True)
-    plt.legend()
-    return fig
-
-# Streamlit User Interface for Activity Input
-def add_activity_input(key):
-    with st.container():
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            activity_name = st.text_input("Activity Name", key=f"activity_{key}")
-        with col2:
-            duration = st.number_input("Duration (in hours)", min_value=0.5, max_value=12.0, step=0.5, key=f"duration_{key}")
-        with col3:
-            weather_preference = st.selectbox("Preferred Weather", ["Sunny", "Cloudy", "Rainy"], key=f"weather_{key}")
-    return {"name": activity_name, "duration": duration, "weather": weather_preference}
 
 # Function implementing CP-Net logic
 def CPNet(activities, weather_data, start_datetime, end_datetime):
@@ -144,6 +123,27 @@ def CPNet(activities, weather_data, start_datetime, end_datetime):
             best_schedule = current_schedule
 
     return best_schedule
+
+# Function for plotting the activity timeline
+def plot_activity_timeline(schedule, planning_day):
+    fig, ax = plt.subplots(figsize=(10, 3))
+    colors = list(mcolors.TABLEAU_COLORS.values())
+    color_idx = 0
+
+    for activity, details in schedule.items():
+        start = details['start']
+        end = details['end']
+        ax.plot([start, end], [1, 1], color=colors[color_idx], linewidth=6, label=activity)
+        color_idx = (color_idx + 1) % len(colors)
+
+    ax.set_yticks([])
+    ax.set_xlabel('Time')
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    plt.xticks(rotation=45)
+    plt.title(f'Activity Timeline for {planning_day.strftime("%Y-%m-%d")}')
+    plt.grid(True)
+    plt.legend()
+    return fig
 
 # Streamlit UI for scheduling activities
 def user_interface():
