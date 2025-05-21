@@ -8,7 +8,7 @@ import pandas as pd
 import requests
 
 # Constants and Global Variables
-api_key = "28c300a25e5245d6ba3223640231511"
+api_key = ""
 location = "Los Angeles"
 
 # Function to Fetch and Process Weather Data for a Specific Day
